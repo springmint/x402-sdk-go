@@ -60,7 +60,7 @@ router.Use(ginmw.PaywallMiddleware(middleware.PaywallConfig{
     Scheme:          "permit402",
     Network:         x402.BSCMainnet,
     PayToAddress:    "0xYourAddress",
-    Amount:          "1000000", // 1 USDT (6 decimals)
+    Amount:          "1000000000000000000", // 1 USDT (18 decimals on BSC)
     Asset:           "USDT",
     FacilitatorURL:  "https://cppay.finance/api/x402/facilitator",
 }))
@@ -81,9 +81,9 @@ resp, err := client.Get("https://api.example.com/protected-resource")
 
 | Network | Identifier | Permit402 Address |
 |---------|-----------|-------------------|
-| TRON Mainnet | `tron:mainnet` | `TT8rEWbCoNX7vpEUauxb7rWJsTgs8vDLAn` |
-| TRON Nile | `tron:nile` | `TFxDcGvS7zfQrS1YzcCMp673ta2NHHzsiH` |
-| TRON Shasta | `tron:shasta` | `TR2XninQ3jsvRRLGTifFyUHTBysffooUjt` |
+| TRON Mainnet | `tron:mainnet` | — |
+| TRON Nile | `tron:nile` | — |
+| TRON Shasta | `tron:shasta` | — |
 | BSC Mainnet | `eip155:56` | `0x105a6f4613a1d1c17ef35d4d5f053fa2e659a958` |
 
 ## Supported Tokens
