@@ -37,9 +37,9 @@ var NetworkConfig = struct {
 		BaseMainnet: 8453,
 	},
 	Permit402Addresses: map[string]string{
-		TronMainnet: "",
-		TronShasta:  "",
-		TronNile:    "",
+		TronMainnet: "TK5kfgbNK5B5sFWSbtDs2HyCaSUuEzfN2B",
+		TronShasta:  "TSNfGRDkyyDY4dHsWzQ6rWWG63p9iczz1k",
+		TronNile:    "TRK2rYmbyFZKcPTDREEF36rEsLfDWZXnjA",
 		BSCMainnet:  "0x105a6f4613a1d1c17ef35d4d5f053fa2e659a958",
 		BSCTestnet:  "",
 		BaseMainnet: "",

@@ -1,18 +1,18 @@
 package x402
 
-// Delivery kind constants
+// Payment type constants
 const (
 	PaymentOnly = "PAYMENT_ONLY"
 )
 
-// KindMap maps delivery kind string to EIP-712 numeric value
-var KindMap = map[string]uint8{
+// PtypeMap maps payment type string to EIP-712 numeric value
+var PtypeMap = map[string]uint8{
 	PaymentOnly: 0,
 }
 
 // PermitMeta is payment permit metadata
 type PermitMeta struct {
-	Kind       string `json:"kind"`
+	Ptype      string `json:"ptype"`
 	PaymentID  string `json:"paymentId"`
 	Nonce      string `json:"nonce"`
 	ValidAfter int64  `json:"validAfter"`
@@ -67,7 +67,7 @@ type PaymentRequirements struct {
 
 // Permit402ContextMeta is meta in permit402 context
 type Permit402ContextMeta struct {
-	Kind       string `json:"kind"`
+	Ptype      string `json:"ptype"`
 	PaymentID  string `json:"paymentId"`
 	Nonce      string `json:"nonce"`
 	ValidAfter int64  `json:"validAfter"`

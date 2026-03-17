@@ -67,7 +67,7 @@ func (c *X402HTTPClient) RequestWithPayment(ctx context.Context, method, urlStr 
 	if paymentRequired.Extensions != nil && paymentRequired.Extensions.Permit402Context != nil {
 		extensions["permit402Context"] = map[string]any{
 			"meta": map[string]any{
-				"kind":        paymentRequired.Extensions.Permit402Context.Meta.Kind,
+				"ptype":       paymentRequired.Extensions.Permit402Context.Meta.Ptype,
 				"paymentId":   paymentRequired.Extensions.Permit402Context.Meta.PaymentID,
 				"nonce":       paymentRequired.Extensions.Permit402Context.Meta.Nonce,
 				"validAfter":  paymentRequired.Extensions.Permit402Context.Meta.ValidAfter,

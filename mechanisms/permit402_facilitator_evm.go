@@ -266,7 +266,7 @@ func (m *Permit402EvmFacilitatorMechanism) buildPermitArg(permit *x402.Permit402
 		return nil, err
 	}
 	ptype := uint8(0)
-	if k, ok := x402.KindMap[permit.Meta.Kind]; ok {
+	if k, ok := x402.PtypeMap[permit.Meta.Ptype]; ok {
 		ptype = k
 	}
 	nonce := new(big.Int)
