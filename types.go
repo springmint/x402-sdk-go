@@ -1,18 +1,18 @@
 package x402
 
-// Delivery kind constants
+// Delivery ptype constants
 const (
 	PaymentOnly = "PAYMENT_ONLY"
 )
 
-// KindMap maps delivery kind string to EIP-712 numeric value
-var KindMap = map[string]uint8{
+// PtypeMap maps delivery ptype string to EIP-712 numeric value
+var PtypeMap = map[string]uint8{
 	PaymentOnly: 0,
 }
 
 // PermitMeta is payment permit metadata
 type PermitMeta struct {
-	Kind       string `json:"kind"`
+	Ptype      string `json:"ptype"`
 	PaymentID  string `json:"paymentId"`
 	Nonce      string `json:"nonce"`
 	ValidAfter int64  `json:"validAfter"`
@@ -67,7 +67,7 @@ type PaymentRequirements struct {
 
 // Permit402ContextMeta is meta in permit402 context
 type Permit402ContextMeta struct {
-	Kind       string `json:"kind"`
+	Ptype      string `json:"ptype"`
 	PaymentID  string `json:"paymentId"`
 	Nonce      string `json:"nonce"`
 	ValidAfter int64  `json:"validAfter"`
@@ -136,8 +136,8 @@ type SettleResponse struct {
 	ErrorReason string `json:"errorReason,omitempty"`
 }
 
-// SupportedKind is supported payment kind
-type SupportedKind struct {
+// SupportedPtype is supported payment ptype
+type SupportedPtype struct {
 	X402Version int    `json:"x402Version"`
 	Scheme      string `json:"scheme"`
 	Network     string `json:"network"`
@@ -159,8 +159,8 @@ type PaymentConfigItem struct {
 
 // SupportedResponse is supported response from facilitator
 type SupportedResponse struct {
-	Kinds []SupportedKind `json:"kinds"`
-	Fee   SupportedFee    `json:"fee"`
+	Ptypes []SupportedPtype `json:"ptypes"`
+	Fee    SupportedFee     `json:"fee"`
 }
 
 // FeeQuoteResponse is fee quote response from facilitator

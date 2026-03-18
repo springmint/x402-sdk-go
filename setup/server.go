@@ -15,3 +15,12 @@ func RegisterEVMChains(s *x402.X402Server) *x402.X402Server {
 	}
 	return s
 }
+
+// RegisterTronChains registers permit402 for Tron mainnet, Shasta, and Nile.
+// Pass a TronFacilitatorSigner when configuring the facilitator for Settle.
+func RegisterTronChains(s *x402.X402Server) *x402.X402Server {
+	for _, chain := range []string{x402.TronMainnet, x402.TronShasta, x402.TronNile} {
+		s.Register(chain, &mechanisms.Permit402EvmServerMechanism{})
+	}
+	return s
+}

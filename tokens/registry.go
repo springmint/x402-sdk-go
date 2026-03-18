@@ -3,6 +3,8 @@ package tokens
 import (
 	"strconv"
 	"strings"
+
+	"github.com/springmint/x402-sdk-go/tron"
 )
 
 // TokenInfo holds token metadata
@@ -35,6 +37,18 @@ var registry = map[string]map[string]*TokenInfo{
 		"USDC": {Address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", Decimals: 6, Name: "USD Coin", Symbol: "USDC", Version: "2", SupportsTransferWithAuthorization: true},
 		"USDT": {Address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2", Decimals: 6, Name: "Tether USD", Symbol: "USDT", Version: "1", SupportsTransferWithAuthorization: false},
 	},
+	// TRON Networks
+	"tron:mainnet": {
+		"USDT": {Address: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", Decimals: 6, Name: "Tether USD", Symbol: "USDT", Version: "1", SupportsTransferWithAuthorization: false},
+		"USDD": {Address: "TXDk8mbtRbXeYuMNS83CfKPaYYT8XWv9Hz", Decimals: 18, Name: "Decentralized USD", Symbol: "USDD", Version: "1", SupportsTransferWithAuthorization: false},
+	},
+	"tron:shasta": {
+		"USDT": {Address: "TG3XXyExBkPp9nzdajDZsozEu4BkaSJozs", Decimals: 6, Name: "Tether USD", Symbol: "USDT", Version: "1", SupportsTransferWithAuthorization: false},
+	},
+	"tron:nile": {
+		"USDT": {Address: "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf", Decimals: 6, Name: "Tether USD", Symbol: "USDT", Version: "1", SupportsTransferWithAuthorization: false},
+		"USDD": {Address: "TGjgvdTWWrybVLaVeFqSyVqJQWjxqRYbaK", Decimals: 18, Name: "Decentralized USD", Symbol: "USDD", Version: "1", SupportsTransferWithAuthorization: false},
+	},
 }
 
 // FindByAddress finds token by address
@@ -43,10 +57,22 @@ func FindByAddress(network, address string) *TokenInfo {
 	if tokens == nil {
 		return nil
 	}
-	addrLower := strings.ToLower(address)
+	addrToMatch := address
+	if strings.HasPrefix(network, "tron:") && len(address) >= 2 && address[:2] == "0x" {
+		// Tron registry uses base58; convert hex to base58 for lookup
+		if base58, err := tron.HexToBase58(address); err == nil {
+			addrToMatch = base58
+		}
+	}
 	for _, t := range tokens {
-		if strings.ToLower(t.Address) == addrLower {
-			return t
+		if strings.HasPrefix(network, "tron:") {
+			if t.Address == addrToMatch {
+				return t
+			}
+		} else {
+			if strings.ToLower(t.Address) == strings.ToLower(addrToMatch) {
+				return t
+			}
 		}
 	}
 	return nil
