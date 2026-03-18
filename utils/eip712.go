@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	x402 "github.com/springmint/x402-sdk-go"
+	"github.com/springmint/x402-sdk-go/tron"
 )
 
 // PaymentIDToBytes converts payment ID from hex string to bytes16
@@ -30,10 +31,10 @@ type EIP712Message struct {
 }
 
 type EIP712PermitMeta struct {
-	Ptype      uint8
-	PaymentID  []byte
-	Nonce      *big.Int
-	ValidAfter int64
+	Ptype       uint8
+	PaymentID   []byte
+	Nonce       *big.Int
+	ValidAfter  int64
 	ValidBefore int64
 }
 
@@ -54,8 +55,20 @@ func ConvertPermitToEIP712Message(permit *x402.Permit402) (*EIP712Message, error
 	if err != nil {
 		return nil, err
 	}
+	// TIP-712 on Tron uses EIP-712 "address" fields, which must be 20-byte hex (0x + 40 chars).
+	// Some clients may still send Tron base58 (T...) addresses in the permit payload; normalize them
+	// here to keep hashing/verifying consistent.
+	normAddr := func(s string) string {
+		if s == "" || strings.HasPrefix(s, "0x") {
+			return s
+		}
+		if h, err := tron.ToHex(s); err == nil {
+			return h
+		}
+		return s
+	}
 	ptype := uint8(0)
-	if k, ok := x402.KindMap[permit.Meta.Kind]; ok {
+	if k, ok := x402.PtypeMap[permit.Meta.Ptype]; ok {
 		ptype = k
 	}
 	nonce := new(big.Int)
@@ -68,20 +81,20 @@ func ConvertPermitToEIP712Message(permit *x402.Permit402) (*EIP712Message, error
 	feeAmount.SetString(permit.Fee.FeeAmount, 10)
 	return &EIP712Message{
 		Meta: EIP712PermitMeta{
-			Ptype:      ptype,
-			PaymentID:  paymentIDBytes,
-			Nonce:      nonce,
-			ValidAfter: permit.Meta.ValidAfter,
+			Ptype:       ptype,
+			PaymentID:   paymentIDBytes,
+			Nonce:       nonce,
+			ValidAfter:  permit.Meta.ValidAfter,
 			ValidBefore: permit.Meta.ValidBefore,
 		},
-		Buyer: permit.Buyer,
+		Buyer: normAddr(permit.Buyer),
 		Payment: EIP712Payment{
-			PayToken:  permit.Payment.PayToken,
+			PayToken:  normAddr(permit.Payment.PayToken),
 			PayAmount: payAmount,
-			PayTo:     permit.Payment.PayTo,
+			PayTo:     normAddr(permit.Payment.PayTo),
 		},
 		Fee: EIP712Fee{
-			FeeTo:     permit.Fee.FeeTo,
+			FeeTo:     normAddr(permit.Fee.FeeTo),
 			FeeAmount: feeAmount,
 		},
 	}, nil

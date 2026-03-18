@@ -41,7 +41,7 @@ func (m *Permit402EvmClientMechanism) CreatePaymentPayload(ctx context.Context, 
 
 	permit := &x402.Permit402{
 		Meta: x402.PermitMeta{
-			Kind:        getStr(ctxMeta, "kind"),
+			Ptype:       getStr(ctxMeta, "ptype"),
 			PaymentID:   getStr(ctxMeta, "paymentId"),
 			Nonce:       getStr(ctxMeta, "nonce"),
 			ValidAfter:  getInt64(ctxMeta, "validAfter"),

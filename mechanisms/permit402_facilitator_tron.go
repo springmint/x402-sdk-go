@@ -11,50 +11,45 @@ import (
 	"github.com/springmint/x402-sdk-go/abi"
 	"github.com/springmint/x402-sdk-go/signers"
 	"github.com/springmint/x402-sdk-go/tokens"
-	"github.com/springmint/x402-sdk-go/tron"
 	"github.com/springmint/x402-sdk-go/utils"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/springmint/x402-sdk-go/tron"
 )
 
-const (
-	SchemePermit402       = "permit402"
-	FeeQuoteExpirySeconds = 300
-)
-
-// Permit402 contract error selectors for debugging
-var Permit402Errors = map[string]string{
-	"0xb7d09497": "InvalidTimestamp",
-	"0x756688fe": "InvalidNonce",
-	"0x8baa579f": "InvalidSignature",
-	"0x1fb09b80": "NonceAlreadyUsed",
-	"0x2b79ed30": "InvalidPtype",
-	"0xadf31a79": "BuyerMismatch",
-}
-
-func DecodePermit402Error(data string) string {
-	if len(data) >= 10 {
-		selector := data[:10]
-		if errName, ok := Permit402Errors[selector]; ok {
-			return errName
-		}
+func normalizeTronEvmAddress(addr string) (common.Address, error) {
+	if strings.TrimSpace(addr) == "" {
+		return common.Address{}, nil
 	}
-	return "Unknown error: " + data
+
+	// Accept either:
+	// - Tron base58 (T...)
+	// - EVM hex with 0x prefix
+	// - EVM hex without 0x prefix
+	a := strings.TrimSpace(addr)
+	if strings.HasPrefix(a, "0x") {
+		return common.HexToAddress(a), nil
+	}
+	if h, err := tron.ToHex(a); err == nil && h != "" {
+		return common.HexToAddress(h), nil
+	}
+	// Fall back: treat as raw hex without prefix.
+	return common.HexToAddress("0x" + a), nil
 }
 
-// Permit402EvmFacilitatorMechanism implements permit402 facilitator for EVM
-type Permit402EvmFacilitatorMechanism struct {
-	Signer  signers.FacilitatorSigner
+// Permit402TronFacilitatorMechanism implements permit402 facilitator for Tron
+type Permit402TronFacilitatorMechanism struct {
+	Signer  *signers.TronFacilitatorSigner
 	FeeTo   string
-	BaseFee map[string]int // symbol -> amount in smallest units
+	BaseFee map[string]int
 }
 
-// NewPermit402EvmFacilitatorMechanism creates a Permit402 EVM facilitator
-func NewPermit402EvmFacilitatorMechanism(signer signers.FacilitatorSigner, feeTo string, baseFee map[string]int) *Permit402EvmFacilitatorMechanism {
+// NewPermit402TronFacilitatorMechanism creates a Tron permit402 facilitator
+func NewPermit402TronFacilitatorMechanism(signer *signers.TronFacilitatorSigner, feeTo string, baseFee map[string]int) *Permit402TronFacilitatorMechanism {
 	if feeTo == "" {
 		feeTo = signer.GetAddress()
 	}
-	return &Permit402EvmFacilitatorMechanism{
+	return &Permit402TronFacilitatorMechanism{
 		Signer:  signer,
 		FeeTo:   feeTo,
 		BaseFee: baseFee,
@@ -62,20 +57,24 @@ func NewPermit402EvmFacilitatorMechanism(signer signers.FacilitatorSigner, feeTo
 }
 
 // Scheme returns "permit402"
-func (m *Permit402EvmFacilitatorMechanism) Scheme() string {
+func (m *Permit402TronFacilitatorMechanism) Scheme() string {
 	return SchemePermit402
 }
 
-// FeeQuote returns fee quote for the given requirements
-func (m *Permit402EvmFacilitatorMechanism) FeeQuote(ctx context.Context, accept x402.PaymentRequirements) (*x402.FeeQuoteResponse, error) {
+// FeeQuote returns fee quote
+func (m *Permit402TronFacilitatorMechanism) FeeQuote(ctx context.Context, accept x402.PaymentRequirements) (*x402.FeeQuoteResponse, error) {
 	baseFee := m.getBaseFee(accept.Asset, accept.Network)
 	if baseFee < 0 {
 		return nil, nil
 	}
 	expires := time.Now().Unix() + FeeQuoteExpirySeconds
+	feeToHex := m.FeeTo
+	if h, err := tron.ToHex(m.FeeTo); err == nil {
+		feeToHex = h
+	}
 	return &x402.FeeQuoteResponse{
 		Fee: x402.FeeInfo{
-			FeeTo:     m.FeeTo,
+			FeeTo:     feeToHex,
 			FeeAmount: strconv.Itoa(baseFee),
 		},
 		Pricing:   "flat",
@@ -86,23 +85,22 @@ func (m *Permit402EvmFacilitatorMechanism) FeeQuote(ctx context.Context, accept 
 	}, nil
 }
 
-func (m *Permit402EvmFacilitatorMechanism) getBaseFee(asset, network string) int {
+func (m *Permit402TronFacilitatorMechanism) getBaseFee(asset, network string) int {
 	info := tokens.FindByAddress(network, asset)
 	if info == nil {
 		return -1
 	}
-	symbol := strings.ToUpper(info.Symbol)
 	if m.BaseFee == nil {
 		return 0
 	}
-	if fee, ok := m.BaseFee[symbol]; ok {
+	if fee, ok := m.BaseFee[strings.ToUpper(info.Symbol)]; ok {
 		return fee
 	}
 	return 0
 }
 
-// Verify validates permit and EIP-712 signature
-func (m *Permit402EvmFacilitatorMechanism) Verify(ctx context.Context, payload *x402.PaymentPayload, requirements x402.PaymentRequirements) (*x402.VerifyResponse, error) {
+// Verify validates permit and TIP-712 signature
+func (m *Permit402TronFacilitatorMechanism) Verify(ctx context.Context, payload *x402.PaymentPayload, requirements x402.PaymentRequirements) (*x402.VerifyResponse, error) {
 	if payload.Payload.Permit402 == nil {
 		return &x402.VerifyResponse{IsValid: false, InvalidReason: "missing_permit402"}, nil
 	}
@@ -115,16 +113,14 @@ func (m *Permit402EvmFacilitatorMechanism) Verify(ctx context.Context, payload *
 		return &x402.VerifyResponse{IsValid: false, InvalidReason: "unsupported_network"}, nil
 	}
 	permitAddr := x402.GetPermit402Address(requirements.Network)
-	if strings.HasPrefix(requirements.Network, "tron:") {
-		// Tron: client signs with hex domain; convert base58 to hex for EIP-712 digest
-		if h, err := tron.ToHex(permitAddr); err == nil {
-			permitAddr = h
-		}
+	permitAddrHex, err := tron.ToHex(permitAddr)
+	if err != nil {
+		return &x402.VerifyResponse{IsValid: false, InvalidReason: "invalid_permit_addr"}, nil
 	}
 	domain := map[string]any{
 		"name":              "Permit402",
 		"chainId":           chainID,
-		"verifyingContract": permitAddr,
+		"verifyingContract": permitAddrHex,
 	}
 	typesMap := abiTypesToMap(abi.GetPermit402EIP712Types())
 	eip712Msg, err := utils.ConvertPermitToEIP712Message(permit)
@@ -139,19 +135,16 @@ func (m *Permit402EvmFacilitatorMechanism) Verify(ctx context.Context, payload *
 	return &x402.VerifyResponse{IsValid: true}, nil
 }
 
-func (m *Permit402EvmFacilitatorMechanism) validatePermit(permit *x402.Permit402, req x402.PaymentRequirements) string {
+func (m *Permit402TronFacilitatorMechanism) validatePermit(permit *x402.Permit402, req x402.PaymentRequirements) string {
 	norm := func(addr string) string {
 		if addr == "" {
 			return ""
 		}
-		if strings.HasPrefix(req.Network, "tron:") {
-			h, err := tron.ToHex(addr)
-			if err != nil {
-				return strings.ToLower(addr)
-			}
-			return strings.ToLower(h)
+		h, err := tron.ToHex(addr)
+		if err != nil {
+			return strings.ToLower(addr)
 		}
-		return strings.ToLower(commonHex(addr))
+		return strings.ToLower(h)
 	}
 	payAmt := new(big.Int)
 	payAmt.SetString(permit.Payment.PayAmount, 10)
@@ -166,7 +159,7 @@ func (m *Permit402EvmFacilitatorMechanism) validatePermit(permit *x402.Permit402
 	if norm(permit.Payment.PayToken) != norm(req.Asset) {
 		return "token_mismatch"
 	}
-	zeroAddr := x402.ZeroAddress
+	zeroAddr := strings.ToLower(x402.ZeroAddress)
 	feeToNorm := norm(permit.Fee.FeeTo)
 	if feeToNorm != zeroAddr {
 		if feeToNorm != norm(m.FeeTo) {
@@ -191,8 +184,8 @@ func (m *Permit402EvmFacilitatorMechanism) validatePermit(permit *x402.Permit402
 	return ""
 }
 
-// Settle calls permitTransferFrom on Permit402 contract
-func (m *Permit402EvmFacilitatorMechanism) Settle(ctx context.Context, payload *x402.PaymentPayload, requirements x402.PaymentRequirements) (*x402.SettleResponse, error) {
+// Settle calls permitTransferFrom on Tron Permit402 contract
+func (m *Permit402TronFacilitatorMechanism) Settle(ctx context.Context, payload *x402.PaymentPayload, requirements x402.PaymentRequirements) (*x402.SettleResponse, error) {
 	resp, err := m.Verify(ctx, payload, requirements)
 	if err != nil || !resp.IsValid {
 		return &x402.SettleResponse{
@@ -215,14 +208,25 @@ func (m *Permit402EvmFacilitatorMechanism) Settle(ctx context.Context, payload *
 		sig = sig[2:]
 	}
 	sigBytes, _ := hexDecode(sig)
-	buyer := normAddr(permit.Buyer)
-	contractAddr := x402.GetPermit402Address(requirements.Network)
-	args := []any{*permitArg, common.HexToAddress(buyer), sigBytes}
-	txHash, err := m.Signer.WriteContract(ctx, contractAddr, abi.Permit402ABI, "permitTransferFrom", args, requirements.Network)
-	if err != nil || txHash == "" {
+	buyerAddr, err := normalizeTronEvmAddress(permit.Buyer)
+	if err != nil {
 		return &x402.SettleResponse{
 			Success:     false,
-			ErrorReason: "transaction_failed",
+			ErrorReason: "invalid_buyer",
+			Network:     requirements.Network,
+		}, nil
+	}
+	contractAddr := x402.GetPermit402Address(requirements.Network)
+	args := []any{*permitArg, buyerAddr, sigBytes}
+	txHash, err := m.Signer.WriteContract(ctx, contractAddr, abi.Permit402ABI, "permitTransferFrom", args, requirements.Network)
+	if err != nil || txHash == "" {
+		errMsg := "transaction_failed"
+		if err != nil {
+			errMsg = errMsg + ": " + err.Error()
+		}
+		return &x402.SettleResponse{
+			Success:     false,
+			ErrorReason: errMsg,
 			Network:     requirements.Network,
 		}, nil
 	}
@@ -251,35 +255,7 @@ func (m *Permit402EvmFacilitatorMechanism) Settle(ctx context.Context, payload *
 	}, nil
 }
 
-// Types matching Permit402 tuple ABI (IPermit402.Permit402Details)
-type permitMetaArg struct {
-	Ptype       uint8    `abi:"ptype"`
-	PaymentID   [16]byte `abi:"paymentId"`
-	Nonce       *big.Int `abi:"nonce"`
-	ValidAfter  *big.Int `abi:"validAfter"`
-	ValidBefore *big.Int `abi:"validBefore"`
-}
-
-type paymentArg struct {
-	PayToken  common.Address `abi:"payToken"`
-	PayAmount *big.Int       `abi:"payAmount"`
-	PayTo     common.Address `abi:"payTo"`
-}
-
-type feeArg struct {
-	FeeTo     common.Address `abi:"feeTo"`
-	FeeAmount *big.Int       `abi:"feeAmount"`
-}
-
-type permitArg struct {
-	Meta    permitMetaArg  `abi:"meta"`
-	Buyer   common.Address `abi:"buyer"`
-	Payment paymentArg     `abi:"payment"`
-	Fee     feeArg         `abi:"fee"`
-}
-
-// buildPermitArg converts Permit402 into the struct matching Permit402ABI tuple.
-func (m *Permit402EvmFacilitatorMechanism) buildPermitArg(permit *x402.Permit402) (*permitArg, error) {
+func (m *Permit402TronFacilitatorMechanism) buildPermitArg(permit *x402.Permit402) (*permitArg, error) {
 	paymentIDBytes, err := utils.PaymentIDToBytes(permit.Meta.PaymentID)
 	if err != nil {
 		return nil, err
@@ -305,54 +281,37 @@ func (m *Permit402EvmFacilitatorMechanism) buildPermitArg(permit *x402.Permit402
 	payAmount.SetString(permit.Payment.PayAmount, 10)
 	feeAmount := new(big.Int)
 	feeAmount.SetString(permit.Fee.FeeAmount, 10)
+
+	payTokenAddr, err := normalizeTronEvmAddress(permit.Payment.PayToken)
+	if err != nil {
+		return nil, err
+	}
+	payToAddr, err := normalizeTronEvmAddress(permit.Payment.PayTo)
+	if err != nil {
+		return nil, err
+	}
+	feeToAddr, err := normalizeTronEvmAddress(permit.Fee.FeeTo)
+	if err != nil {
+		return nil, err
+	}
+	buyerAddr, err := normalizeTronEvmAddress(permit.Buyer)
+	if err != nil {
+		return nil, err
+	}
+
 	payment := paymentArg{
-		PayToken:  common.HexToAddress(permit.Payment.PayToken),
+		PayToken:  payTokenAddr,
 		PayAmount: payAmount,
-		PayTo:     common.HexToAddress(permit.Payment.PayTo),
+		PayTo:     payToAddr,
 	}
 	fee := feeArg{
-		FeeTo:     common.HexToAddress(permit.Fee.FeeTo),
+		FeeTo:     feeToAddr,
 		FeeAmount: feeAmount,
 	}
-	out := &permitArg{
+	return &permitArg{
 		Meta:    meta,
-		Buyer:   common.HexToAddress(permit.Buyer),
+		Buyer:   buyerAddr,
 		Payment: payment,
 		Fee:     fee,
-	}
-	return out, nil
-}
-
-func commonHex(addr string) string {
-	if len(addr) >= 2 && addr[:2] == "0x" {
-		return addr
-	}
-	return "0x" + addr
-}
-
-func normAddr(addr string) string {
-	return strings.ToLower(commonHex(addr))
-}
-
-func hexDecode(s string) ([]byte, error) {
-	if len(s)%2 != 0 {
-		s = "0" + s
-	}
-	b := make([]byte, len(s)/2)
-	for i := 0; i < len(s); i += 2 {
-		var n byte
-		for _, c := range s[i : i+2] {
-			n <<= 4
-			switch {
-			case c >= '0' && c <= '9':
-				n |= byte(c - '0')
-			case c >= 'a' && c <= 'f':
-				n |= byte(c - 'a' + 10)
-			case c >= 'A' && c <= 'F':
-				n |= byte(c - 'A' + 10)
-			}
-		}
-		b[i/2] = n
-	}
-	return b, nil
+	}, nil
 }

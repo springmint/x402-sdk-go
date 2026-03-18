@@ -22,9 +22,9 @@ const (
 
 // NetworkConfig holds network configuration
 var NetworkConfig = struct {
-	ChainIDs               map[string]int64
+	ChainIDs           map[string]int64
 	Permit402Addresses map[string]string
-	RPCURLs                map[string]string
+	RPCURLs            map[string]string
 }{
 	ChainIDs: map[string]int64{
 		TronMainnet: 728126428,
@@ -37,9 +37,9 @@ var NetworkConfig = struct {
 		BaseMainnet: 8453,
 	},
 	Permit402Addresses: map[string]string{
-		TronMainnet: "",
-		TronShasta:  "",
-		TronNile:    "",
+		TronMainnet: "TK5kfgbNK5B5sFWSbtDs2HyCaSUuEzfN2B",
+		TronShasta:  "TSNfGRDkyyDY4dHsWzQ6rWWG63p9iczz1k",
+		TronNile:    "TRK2rYmbyFZKcPTDREEF36rEsLfDWZXnjA",
 		BSCMainnet:  "0x105a6f4613a1d1c17ef35d4d5f053fa2e659a958",
 		BSCTestnet:  "",
 		BaseMainnet: "",
@@ -51,10 +51,14 @@ var NetworkConfig = struct {
 		EVMMainnet:  "https://eth.llamarpc.com",
 		EVMSepolia:  "https://rpc.sepolia.org",
 		BaseMainnet: "https://mainnet.base.org",
+		// Tron networks (TronGrid API base URL)
+		TronMainnet: "https://api.trongrid.io",
+		TronShasta:  "https://api.shasta.trongrid.io",
+		TronNile:    "https://nile.trongrid.io",
 	},
 }
 
-// GetRPCURL returns RPC URL for an EVM network
+// GetRPCURL returns RPC URL for a network (EVM or Tron)
 func GetRPCURL(network string) string {
 	return NetworkConfig.RPCURLs[network]
 }

@@ -189,7 +189,7 @@ func (s *X402Server) CreatePaymentRequiredResponse(requirements []PaymentRequire
 	ext := &PaymentRequiredExtensions{
 		Permit402Context: &Permit402Context{
 			Meta: Permit402ContextMeta{
-				Kind:        PaymentOnly,
+				Ptype:       PaymentOnly,
 				PaymentID:   paymentID,
 				Nonce:       nonce,
 				ValidAfter:  *validAfter,
